@@ -1,0 +1,4 @@
+name: "user-web"
+user_srv:
+  host: '-'
+  port: 50051
