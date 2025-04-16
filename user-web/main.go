@@ -17,6 +17,14 @@ func main() {
 	// 初始化config
 	initialize.InitConfig()
 
+	// 初始化redis
+	initialize.InitRedis()
+	defer initialize.CloseRedis()
+
+	// 初始化grpc
+	initialize.InitGrpc()
+	defer initialize.CloseGrpc()
+
 	// 初始化router
 	router := initialize.InitRouter()
 

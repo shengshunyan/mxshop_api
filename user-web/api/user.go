@@ -2,17 +2,17 @@ package api
 
 import (
 	"context"
-	"fmt"
+	"github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"
 	userProto "github.com/shengshunyan/mxshop-proto/user/proto"
 	"go.uber.org/zap"
-	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
 	"mxshop_api/user-web/forms"
 	"mxshop_api/user-web/global"
 	"mxshop_api/user-web/global/response"
+	"mxshop_api/user-web/middlewares"
+	"mxshop_api/user-web/models"
 	"net/http"
 	"strconv"
 	"time"
@@ -51,22 +51,7 @@ func HandleGrpcErrorToHttp(err error, c *gin.Context) {
 
 // 获取用户列表
 func GetUserList(ctx *gin.Context) {
-	// 拨号连接grpc服务
-	conn, err := grpc.NewClient(fmt.Sprintf("%s:%d",
-		global.ServerConfig.UserServer.Host,
-		global.ServerConfig.UserServer.Port),
-		grpc.WithTransportCredentials(insecure.NewCredentials()))
-	if err != nil {
-		panic("new client failed" + err.Error())
-	}
-	defer func(conn *grpc.ClientConn) {
-		err := conn.Close()
-		if err != nil {
-			panic("close client failed" + err.Error())
-		}
-	}(conn)
-
-	client := userProto.NewUserClient(conn)
+	client := global.Stub.UserClient
 	pn := ctx.DefaultQuery("pn", "1")
 	pnInt, _ := strconv.Atoi(pn)
 	pSize := ctx.DefaultQuery("psize", "10")
@@ -105,23 +90,15 @@ func PasswordLogin(ctx *gin.Context) {
 		return
 	}
 
-	// 拨号连接grpc服务
-	conn, err := grpc.NewClient(fmt.Sprintf("%s:%d",
-		global.ServerConfig.UserServer.Host,
-		global.ServerConfig.UserServer.Port),
-		grpc.WithTransportCredentials(insecure.NewCredentials()))
-	if err != nil {
-		panic("new client failed" + err.Error())
+	// 验证图形验证码
+	if !store.Verify(passwordLoginForm.CaptchaId, passwordLoginForm.Captcha, true) {
+		ctx.JSON(http.StatusBadRequest, gin.H{
+			"msg": "验证码错误",
+		})
+		return
 	}
-	defer func(conn *grpc.ClientConn) {
-		err := conn.Close()
-		if err != nil {
-			panic("close client failed" + err.Error())
-		}
-	}(conn)
 
-	client := userProto.NewUserClient(conn)
-
+	client := global.Stub.UserClient
 	rsp, err := client.GetUserByMobile(context.Background(), &userProto.MobileRequest{
 		Mobile: passwordLoginForm.Mobile,
 	})
@@ -148,7 +125,71 @@ func PasswordLogin(ctx *gin.Context) {
 		})
 		return
 	}
+
+	// 生成token
+	j := middlewares.NewJWT()
+	claims := models.CustomClaims{
+		ID:          uint(rsp.Id),
+		NickName:    rsp.Nickname,
+		AuthorityId: uint(rsp.Role),
+		StandardClaims: jwt.StandardClaims{
+			NotBefore: time.Now().Unix(),                          // 签名生效时间
+			ExpiresAt: time.Now().Add(time.Hour * 24 * 30).Unix(), // 30天过期
+			Issuer:    "imooc",
+		},
+	}
+	token, err := j.CreateToken(claims)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{
+			"msg": "生成token失败",
+		})
+	}
+
 	ctx.JSON(http.StatusOK, gin.H{
-		"msg": "success",
+		"id":         rsp.Id,
+		"nick_name":  rsp.Nickname,
+		"token":      token,
+		"expired_at": time.Now().Add(time.Hour*24*30).Unix() * 1000,
+	})
+}
+
+// 用户注册
+func Register(ctx *gin.Context) {
+	registerForm := forms.RegisterForm{}
+	if err := ctx.ShouldBindJSON(&registerForm); err != nil {
+		ctx.JSON(http.StatusBadRequest, err.Error())
+		return
+	}
+
+	value, err := global.Rdb.Get(context.Background(), registerForm.Mobile).Result()
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{
+			"msg": "验证码获取出错",
+		})
+		return
+	}
+
+	if value != registerForm.Code {
+		ctx.JSON(http.StatusUnauthorized, gin.H{
+			"msg": "验证码错误",
+		})
+		return
+	}
+
+	rsp, err := global.Stub.UserClient.CreateUser(context.Background(), &userProto.CreateUserInfo{
+		Mobile:   registerForm.Mobile,
+		Password: registerForm.Password,
+		Nickname: registerForm.Mobile,
+	})
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{
+			"msg": "注册失败",
+		})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{
+		"id":        rsp.Id,
+		"nick_name": rsp.Nickname,
 	})
 }

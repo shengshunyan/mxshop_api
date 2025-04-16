@@ -1,5 +1,13 @@
 name: "user-web"
 port: 8021
+
 user_srv:
   host: '127.0.0.1'
   port: 50051
+
+jwt:
+  key: 'Z?WEn9MtsmM)a9RU,RR2'
+
+redis:
+  host: '127.0.0.1'
+  port: 6379
