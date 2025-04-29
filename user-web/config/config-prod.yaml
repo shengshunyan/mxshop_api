@@ -1,9 +1,7 @@
-name: "user-web"
-
-user_srv:
-  host: '-'
-  port: 50051
-
-
-jwt:
-  key: 'Z?WEn9MtsmM)a9RU,RR2'
+host: '127.0.0.1'
+port: 8848
+user: 'nacos'
+password: 'nacos'
+namespace: 'adf60490-115a-4198-8c68-3ef381bdefa1'
+group: 'prod'
+dataid: 'user-web'

@@ -13,6 +13,7 @@ import (
 func main() {
 	// 初始化logger
 	initialize.InitLogger()
+	defer initialize.CloseLogger()
 
 	// 初始化config
 	initialize.InitConfig()
