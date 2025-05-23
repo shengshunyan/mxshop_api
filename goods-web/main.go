@@ -4,12 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/gin-gonic/gin/binding"
-	"github.com/go-playground/validator/v10"
 	"go.uber.org/zap"
-	"mxshop_api/user-web/global"
-	"mxshop_api/user-web/initialize"
-	myValidator "mxshop_api/user-web/validator"
+	"mxshop_api/goods-web/global"
+	"mxshop_api/goods-web/initialize"
 	"net/http"
 	"os"
 	"os/signal"
@@ -25,21 +22,12 @@ func main() {
 	// 初始化config
 	initialize.InitConfig()
 
-	// 初始化redis
-	initialize.InitRedis()
-	defer initialize.CloseRedis()
-
 	// 初始化grpc
 	initialize.InitGrpc()
 	defer initialize.CloseGrpc()
 
 	// 初始化router
 	router := initialize.InitRouter()
-
-	// 注册自定义验证器
-	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
-		_ = v.RegisterValidation("mobile", myValidator.ValidateMobile)
-	}
 
 	// 创建 HTTP Server 实例
 	server := &http.Server{

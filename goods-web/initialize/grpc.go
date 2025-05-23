@@ -2,29 +2,26 @@ package initialize
 
 import (
 	"fmt"
-	"github.com/hashicorp/consul/api"
 	_ "github.com/mbobakov/grpc-consul-resolver" // It's important
-	userProto "github.com/shengshunyan/mxshop-proto/user/proto"
+	goodsProto "github.com/shengshunyan/mxshop-proto/goods/proto"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-	"mxshop_api/user-web/global"
+	"mxshop_api/goods-web/global"
 )
 
 var conn *grpc.ClientConn
 
 func InitGrpc() {
-	// 从注册中心获取到用户服务的信息
+	// 从注册中心获取到服务的信息
 	consulConfig := global.ServerConfig.ConsulInfo
-	userServer := global.ServerConfig.UserServer
-	cfg := api.DefaultConfig()
-	cfg.Address = fmt.Sprintf("%s:%d", consulConfig.Host, consulConfig.Port)
+	goodsServer := global.ServerConfig.GoodsServer
 
 	// 拨号连接grpc服务
 	var err error
 	conn, err = grpc.NewClient(
 		fmt.Sprintf("consul://%s:%d/%s?wait=14s",
-			consulConfig.Host, consulConfig.Port, userServer.Name),
+			consulConfig.Host, consulConfig.Port, goodsServer.Name),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithDefaultServiceConfig(`{"loadBalancingPolicy": "round_robin"}`), // 负载均衡
 	)
@@ -32,7 +29,7 @@ func InitGrpc() {
 		panic("new client failed" + err.Error())
 	}
 
-	global.Stub.UserClient = userProto.NewUserClient(conn)
+	global.Stub.GoodsClient = goodsProto.NewGoodsClient(conn)
 
 	zap.S().Infow("init grpc success")
 }
