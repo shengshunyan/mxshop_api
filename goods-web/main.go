@@ -29,6 +29,10 @@ func main() {
 	// 初始化router
 	router := initialize.InitRouter()
 
+	// 服务注册
+	initialize.InitRegister()
+	defer initialize.CloseRegister()
+
 	// 创建 HTTP Server 实例
 	server := &http.Server{
 		Addr:    fmt.Sprintf(":%d", global.ServerConfig.Port),
